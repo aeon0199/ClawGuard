@@ -2,6 +2,8 @@
 
 ### The version OpenClaw power users actually want.
 
+![ClawGuard Logo](assets/clawguard-logo.jpg)
+
 If you run OpenClaw on a real machine (Mac mini, Linux box, VPS), you don’t want one-off checks.
 You want **always-on monitoring, fast alerts, and a bot-friendly control surface**.
 
