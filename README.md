@@ -1,37 +1,50 @@
-# ClawGuard Lite (Free)
+# ClawGuard Pro
 
-Free, on-demand system health checks for OpenClaw users.
+### The version OpenClaw power users actually want.
 
-This public repository contains **ClawGuard Lite only**:
+If you run OpenClaw on a real machine (Mac mini, Linux box, VPS), you don’t want one-off checks.
+You want **always-on monitoring, fast alerts, and a bot-friendly control surface**.
+
+## Buy ClawGuard Pro
+**https://clawguard.net**
+
+---
+
+## Why Pro
+ClawGuard Pro gives your OpenClaw setup what production systems need:
+
+- 24/7 daemon monitoring (not on-demand snapshots)
+- Live local dashboard
+- Historical metrics + trend analysis
+- Proactive alerts when things start drifting
+- Rich OpenClaw-oriented endpoints and integrations
+
+If your bot has meaningful access to your machine, Pro is the version that helps you keep that machine safe and stable.
+
+## What You Get With Pro
+- Always-on CPU, memory, disk, network monitoring
+- Alerting and recommendations
+- Better operational visibility for autonomous bot workflows
+- Built for low overhead, designed to stay out of the way
+
+Get access at:
+**https://clawguard.net**
+
+---
+
+## Free Lite Version (Public Repo)
+This repository is intentionally **Lite-only**.
+
+Included here:
 - `skill/clawguard-lite/SKILL.md`
 - `skill/clawguard-lite/snapshot.py`
 
-## What Lite Does
-- Runs a one-shot snapshot of CPU, memory, disk, network, and top processes.
-- Great for quick check-ins when you ask your OpenClaw bot for system status.
-- No daemon, no always-on monitoring, no historical ring buffer.
+Lite is useful for quick, one-shot checks, but it is not the full product.
 
-## Use with OpenClaw
-Copy the skill into your OpenClaw workspace and run:
-
+### Run Lite
 ```bash
 python3 skill/clawguard-lite/snapshot.py
 ```
 
-## Want The Full Power Version?
-
-## ClawGuard Pro
-If Lite is the quick pulse check, **ClawGuard Pro** is full-time system defense.
-
-With Pro you get:
-- Always-on daemon monitoring (24/7)
-- Live local dashboard
-- Historical data + trend analysis
-- Proactive alerts
-- Port/watchdog detection and richer OpenClaw integrations
-
-Get ClawGuard Pro here:
+For real deployments, use **ClawGuard Pro**:
 **https://clawguard.net**
-
----
-Built for OpenClaw users who want their bot to run the machine with confidence.
