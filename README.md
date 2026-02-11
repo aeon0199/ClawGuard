@@ -2,12 +2,12 @@
 
 ### The version OpenClaw power users actually want.
 
-![ClawGuard Logo](assets/clawguard-logo.jpg)
+<img src="assets/clawguard-logo.jpg" alt="ClawGuard Logo" width="420" />
 
 If you run OpenClaw on a real machine (Mac mini, Linux box, VPS), you don’t want one-off checks.
 You want **always-on monitoring, fast alerts, and a bot-friendly control surface**.
 
-## Buy ClawGuard Pro
+## Buy ClawGuard Pro - it's only $8
 **https://clawguard.net**
 
 ---
