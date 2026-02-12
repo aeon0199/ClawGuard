@@ -1,11 +1,20 @@
 #!/usr/bin/env python3
+import hashlib
 import json
 import os
 import platform
 import re
 import socket
+import stat
 import subprocess
 import time
+from pathlib import Path
+
+
+OPENCLAW_MIN_REQUIRED = "2026.1.29"
+OPENCLAW_MIN_RECOMMENDED = "2026.1.30"
+CLAWGUARD_HOME = Path.home() / ".clawguard-lite"
+INTEGRITY_BASELINE_PATH = CLAWGUARD_HOME / "integrity-baseline.json"
 
 
 def sh(cmd: str) -> str:
@@ -14,6 +23,341 @@ def sh(cmd: str) -> str:
 
 def now_ms() -> int:
     return int(time.time() * 1000)
+
+
+def parse_version(v: str) -> tuple:
+    if not v:
+        return tuple()
+    nums = re.findall(r"\d+", v)
+    return tuple(int(x) for x in nums[:4])
+
+
+def compare_versions(a: str, b: str) -> int:
+    pa = parse_version(a)
+    pb = parse_version(b)
+    n = max(len(pa), len(pb))
+    pa = pa + (0,) * (n - len(pa))
+    pb = pb + (0,) * (n - len(pb))
+    if pa < pb:
+        return -1
+    if pa > pb:
+        return 1
+    return 0
+
+
+def extract_version(text: str) -> str:
+    if not text:
+        return ""
+    m = re.search(r"\b(\d{4}\.\d+\.\d+)\b", text)
+    return m.group(1) if m else ""
+
+
+def read_json_file(path: Path) -> dict:
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def detect_openclaw_version() -> dict:
+    version = ""
+    source = ""
+
+    cmd_candidates = [
+        ["openclaw", "--version"],
+        ["openclaw", "version"],
+    ]
+    for cmd in cmd_candidates:
+        try:
+            out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, text=True, timeout=2).strip()
+            version = extract_version(out)
+            if version:
+                source = "command"
+                break
+        except Exception:
+            continue
+
+    if not version:
+        cfg_path = Path.home() / ".openclaw" / "openclaw.json"
+        cfg = read_json_file(cfg_path)
+        meta = cfg.get("meta", {})
+        wizard = cfg.get("wizard", {})
+        version = str(meta.get("lastTouchedVersion") or wizard.get("lastRunVersion") or "")
+        if version:
+            source = "openclaw.json"
+
+    status = "warn"
+    message = "OpenClaw version not detected; cannot validate against known vulnerable versions."
+    if version:
+        if compare_versions(version, OPENCLAW_MIN_REQUIRED) < 0:
+            status = "critical"
+            message = (
+                f"OpenClaw {version} is below required {OPENCLAW_MIN_REQUIRED} "
+                "and may be vulnerable to known critical issues."
+            )
+        elif compare_versions(version, OPENCLAW_MIN_RECOMMENDED) < 0:
+            status = "warn"
+            message = (
+                f"OpenClaw {version} is below recommended {OPENCLAW_MIN_RECOMMENDED}. "
+                "Upgrade for latest security fixes."
+            )
+        else:
+            status = "ok"
+            message = f"OpenClaw {version} meets the recommended security baseline."
+
+    return {
+        "installed": bool(version),
+        "version": version,
+        "source": source,
+        "minimum_required": OPENCLAW_MIN_REQUIRED,
+        "minimum_recommended": OPENCLAW_MIN_RECOMMENDED,
+        "status": status,
+        "message": message,
+    }
+
+
+def file_mode_summary(path: Path) -> dict:
+    try:
+        st = path.stat()
+        mode = stat.S_IMODE(st.st_mode)
+        world_readable = bool(mode & stat.S_IROTH)
+        world_writable = bool(mode & stat.S_IWOTH)
+        group_writable = bool(mode & stat.S_IWGRP)
+        return {
+            "octal": oct(mode),
+            "world_readable": world_readable,
+            "world_writable": world_writable,
+            "group_writable": group_writable,
+        }
+    except Exception:
+        return {}
+
+
+def openclaw_config_findings() -> list:
+    findings = []
+    cfg_path = Path.home() / ".openclaw" / "openclaw.json"
+    cfg = read_json_file(cfg_path)
+    if not cfg:
+        return findings
+
+    gateway = cfg.get("gateway", {})
+    bind = str(gateway.get("bind", "")).strip().lower()
+    auth_mode = str(gateway.get("auth", {}).get("mode", "")).strip().lower()
+
+    if bind and bind not in {"loopback", "127.0.0.1", "localhost", "::1"}:
+        findings.append(
+            {
+                "id": "gateway_bind_exposed",
+                "severity": "critical",
+                "message": f"Gateway bind is '{bind}' (not loopback). This may expose control endpoints.",
+                "path": str(cfg_path),
+            }
+        )
+
+    if auth_mode in {"off", "none", "disabled", "noauth"}:
+        findings.append(
+            {
+                "id": "gateway_auth_disabled",
+                "severity": "critical",
+                "message": "Gateway authentication appears disabled.",
+                "path": str(cfg_path),
+            }
+        )
+
+    mode_info = file_mode_summary(cfg_path)
+    if mode_info:
+        if mode_info.get("world_readable"):
+            findings.append(
+                {
+                    "id": "config_world_readable",
+                    "severity": "warn",
+                    "message": f"OpenClaw config is world-readable ({mode_info.get('octal')}).",
+                    "path": str(cfg_path),
+                }
+            )
+        if mode_info.get("world_writable") or mode_info.get("group_writable"):
+            findings.append(
+                {
+                    "id": "config_writable_by_others",
+                    "severity": "critical",
+                    "message": f"OpenClaw config permissions are too open ({mode_info.get('octal')}).",
+                    "path": str(cfg_path),
+                }
+            )
+
+    return findings
+
+
+def collect_integrity_targets() -> list:
+    targets = []
+    explicit = [
+        Path.home() / ".openclaw" / "openclaw.json",
+        Path.home() / ".openclaw" / "exec-approvals.json",
+        Path.home() / ".openclaw" / "cron" / "jobs.json",
+    ]
+
+    for p in explicit:
+        if p.exists() and p.is_file():
+            targets.append(p)
+
+    skills_dir = Path.home() / ".openclaw" / "workspace" / "skills"
+    if skills_dir.exists():
+        for p in sorted(skills_dir.glob("*/SKILL.md"))[:200]:
+            if p.is_file():
+                targets.append(p)
+
+    # Keep stable ordering, de-dupe while preserving order.
+    seen = set()
+    out = []
+    for p in targets:
+        s = str(p)
+        if s not in seen:
+            seen.add(s)
+            out.append(p)
+    return out
+
+
+def file_sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def integrity_scan() -> dict:
+    CLAWGUARD_HOME.mkdir(parents=True, exist_ok=True)
+    targets = collect_integrity_targets()
+    current = {}
+    errors = []
+    for p in targets:
+        try:
+            current[str(p)] = file_sha256(p)
+        except Exception as e:
+            errors.append({"path": str(p), "error": str(e)})
+
+    reb = os.environ.get("CLAWGUARD_LITE_REBASELINE", "").strip().lower() in {"1", "true", "yes"}
+    now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+    if reb or not INTEGRITY_BASELINE_PATH.exists():
+        baseline = {
+            "created_at": now_iso,
+            "updated_at": now_iso,
+            "files": current,
+        }
+        try:
+            with INTEGRITY_BASELINE_PATH.open("w", encoding="utf-8") as f:
+                json.dump(baseline, f, indent=2, sort_keys=True)
+        except Exception as e:
+            return {
+                "status": "error",
+                "baseline_path": str(INTEGRITY_BASELINE_PATH),
+                "tracked_count": len(current),
+                "changed": [],
+                "new": [],
+                "missing": [],
+                "errors": errors + [{"path": str(INTEGRITY_BASELINE_PATH), "error": str(e)}],
+                "message": "Failed to write integrity baseline.",
+            }
+
+        return {
+            "status": "initialized" if not reb else "rebaselined",
+            "baseline_path": str(INTEGRITY_BASELINE_PATH),
+            "tracked_count": len(current),
+            "changed": [],
+            "new": [],
+            "missing": [],
+            "errors": errors,
+            "message": (
+                "Integrity baseline created. Re-run snapshot to detect unexpected changes."
+                if not reb
+                else "Integrity baseline rebuilt from current files."
+            ),
+        }
+
+    baseline = read_json_file(INTEGRITY_BASELINE_PATH)
+    base_files = baseline.get("files", {}) if isinstance(baseline, dict) else {}
+    changed, new_files, missing = [], [], []
+
+    for p, h in current.items():
+        old = base_files.get(p)
+        if old is None:
+            new_files.append(p)
+        elif old != h:
+            changed.append(p)
+
+    for p in base_files:
+        if p not in current:
+            missing.append(p)
+
+    status = "ok"
+    if changed or missing:
+        status = "warn"
+    elif new_files:
+        status = "info"
+
+    return {
+        "status": status,
+        "baseline_path": str(INTEGRITY_BASELINE_PATH),
+        "tracked_count": len(current),
+        "changed": changed[:25],
+        "new": new_files[:25],
+        "missing": missing[:25],
+        "errors": errors,
+        "message": "Integrity check complete.",
+    }
+
+
+def severity_score(level: str) -> int:
+    if level == "critical":
+        return 3
+    if level == "warn":
+        return 2
+    if level == "info":
+        return 1
+    return 0
+
+
+def build_security_snapshot() -> tuple:
+    openclaw = detect_openclaw_version()
+    findings = openclaw_config_findings()
+    integrity = integrity_scan()
+
+    status = openclaw.get("status", "warn")
+    if integrity.get("status") == "warn" and severity_score(status) < severity_score("warn"):
+        status = "warn"
+    for f in findings:
+        if severity_score(f.get("severity", "ok")) > severity_score(status):
+            status = f.get("severity", status)
+
+    recommendations = []
+    if openclaw.get("status") in {"critical", "warn"}:
+        recommendations.append(
+            f"Upgrade OpenClaw to at least {OPENCLAW_MIN_RECOMMENDED} (current: {openclaw.get('version') or 'unknown'})."
+        )
+    if any(f.get("id") == "gateway_bind_exposed" for f in findings):
+        recommendations.append("Set gateway bind to loopback/localhost only.")
+    if any(f.get("id") == "gateway_auth_disabled" for f in findings):
+        recommendations.append("Enable gateway token auth immediately.")
+    if integrity.get("status") == "warn":
+        recommendations.append(
+            "Investigate unexpected changes in tracked OpenClaw files. If expected, rebaseline with CLAWGUARD_LITE_REBASELINE=1."
+        )
+    if integrity.get("status") == "initialized":
+        recommendations.append("Run the snapshot again to begin detecting integrity drift.")
+
+    if not recommendations:
+        recommendations.append("Security posture looks healthy for current checks.")
+
+    security = {
+        "status": status,
+        "openclaw": openclaw,
+        "config_findings": findings,
+        "integrity": integrity,
+        "finding_count": len(findings),
+    }
+    return security, recommendations
 
 
 def cpu_snapshot() -> dict:
@@ -289,6 +633,8 @@ def main():
     arch = platform.machine()
     cores = os.cpu_count() or 0
 
+    security, recommendations = build_security_snapshot()
+
     payload = {
         "timestamp_ms": now_ms(),
         "system": {
@@ -302,6 +648,8 @@ def main():
         "disks": disk_snapshot(),
         "network": network_snapshot(),
         "processes": top_processes(),
+        "security": security,
+        "recommendations": recommendations,
     }
 
     print(json.dumps(payload, separators=(",", ":"), sort_keys=False))

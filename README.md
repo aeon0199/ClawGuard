@@ -10,6 +10,8 @@ You want **always-on monitoring, fast alerts, and a bot-friendly control surface
 ## Buy ClawGuard Pro - it's only $8
 **https://clawguard.net**
 
+Every release should be verified before install. See `Verify Downloads` below.
+
 ---
 
 ## Why Pro
@@ -40,6 +42,9 @@ This repository is intentionally **Lite-only**.
 Included here:
 - `skill/clawguard-lite/SKILL.md`
 - `skill/clawguard-lite/snapshot.py`
+- `scripts/release/sign_release.sh`
+- `scripts/release/verify_release.sh`
+- `SECURITY.md`
 
 Lite is useful for quick, one-shot checks, but it is not the full product.
 
@@ -47,6 +52,32 @@ Lite is useful for quick, one-shot checks, but it is not the full product.
 ```bash
 python3 skill/clawguard-lite/snapshot.py
 ```
+
+### Lite Security Snapshot
+`snapshot.py` now includes a `security` block with:
+- OpenClaw version posture checks
+- Risky gateway config checks (bind/auth)
+- Integrity drift checks for key OpenClaw files + installed skills
+
+If you intentionally changed trusted files and want a new baseline:
+```bash
+CLAWGUARD_LITE_REBASELINE=1 python3 skill/clawguard-lite/snapshot.py
+```
+
+## Verify Downloads (SHA-256 + Minisign)
+Publisher flow:
+```bash
+./scripts/release/sign_release.sh dist
+```
+
+User verification flow:
+```bash
+./scripts/release/verify_release.sh dist
+```
+
+Optional signing inputs for publishers:
+- `MINISIGN_SECRET_KEY=/path/to/minisign.key`
+- `MINISIGN_PUBLIC_KEY=/path/to/minisign.pub`
 
 For real deployments, use **ClawGuard Pro**:
 **https://clawguard.net**

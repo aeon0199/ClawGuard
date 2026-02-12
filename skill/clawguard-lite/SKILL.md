@@ -28,9 +28,22 @@ When the user asks:
 - "How's my system doing?" -> run `python3 snapshot.py`, summarize CPU/mem/disk, and call out any big offenders in top CPU or top memory.
 - "What's eating my CPU/RAM?" -> use `processes.top_cpu` / `processes.top_mem`.
 - "How much disk space do I have left?" -> use `disks[*].available_bytes` and `disks[*].usage_pct`.
+- "Is my OpenClaw setup safe?" -> summarize `security.status`, `security.openclaw`, `security.config_findings`, and `recommendations`.
+
+## Security Features In Lite
+
+- OpenClaw version posture checks (minimum required + recommended)
+- Risky gateway config checks (auth/bind)
+- Integrity drift checks for selected OpenClaw files and installed skills
+
+Integrity baseline is stored at `~/.clawguard-lite/integrity-baseline.json`.
+
+To intentionally rebuild baseline:
+```bash
+CLAWGUARD_LITE_REBASELINE=1 python3 snapshot.py
+```
 
 ## Notes
 
 - This is **on-demand only**: it does not run in the background, store history, or provide a dashboard.
 - For always-on sampling, history/trends, alerts, and the live dashboard, use the ClawGuard daemon skill.
-
