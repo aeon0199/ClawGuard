@@ -1,11 +1,14 @@
-# ClawGuard Pro
+# ClawGuard Lite (Public Repo)
 
-### The version OpenClaw power users actually want.
+### Free, on-demand system checks for OpenClaw.
+
+Want always-on monitoring, live dashboard, and proactive alerts?
+**Buy ClawGuard Pro - it's only $8:** **https://clawguard.net**
 
 <img src="assets/clawguard-logo.jpg" alt="ClawGuard Logo" width="420" />
 
-If you run OpenClaw on a real machine (Mac mini, Linux box, VPS), you don’t want one-off checks.
-You want **always-on monitoring, fast alerts, and a bot-friendly control surface**.
+If you run OpenClaw on a real machine (Mac mini, Linux box, VPS), Lite gives you fast snapshots on demand.
+For **always-on monitoring, fast alerts, and a bot-friendly control surface**, use Pro.
 
 ## Buy ClawGuard Pro - it's only $8
 **https://clawguard.net**
