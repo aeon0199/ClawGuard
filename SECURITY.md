@@ -1,33 +1,45 @@
 # Security Notes
 
-This public repo contains **ClawGuard Lite** only.
+ClawGuard includes security posture checks and release verification tooling.
 
-## What Lite Checks Today
+## Runtime Security Checks
 
-`skill/clawguard-lite/snapshot.py` includes a `security` section with:
+`GET /api/security` reports:
 
-- OpenClaw version posture against minimum safe/recommended versions
-- Risky local OpenClaw gateway config checks (bind/auth)
-- Basic permissions checks for sensitive config
-- Integrity drift checks for selected OpenClaw files and installed skills
+- OpenClaw version posture (required/recommended minimums)
+- OpenClaw gateway/config risk findings (bind/auth + file permissions)
+- Integrity drift checks for key OpenClaw files and installed skills
+- Actionable recommendations for bots/users
+
+`GET /api/containment` reports:
+
+- containment mode and policy state (enabled/shadow/enforced)
+- recent containment actions and outcomes
+
+HTTP/API safety defaults:
+- hard monitor-only mode available via `mode = readonly` (disables containment execution)
+- loopback bind by default (`http_bind = 127.0.0.1`)
+- non-loopback bind is blocked unless `allow_remote_http = true`
+- remote API use requires `api_auth_token` (`Authorization: Bearer` or `X-API-Key`)
+- API rate limiting is enabled by default (`api_rate_limit_per_min`)
+- dashboard responses include a restrictive CSP header
+- wildcard CORS is not enabled
 
 ## Integrity Baseline
 
-On first run, Lite writes:
+Baseline file (default):
 
-- `~/.clawguard-lite/integrity-baseline.json`
+- `~/.clawguard/integrity-baseline.txt`
 
-Use this baseline to detect unexpected local changes in later runs.
-
-If you intentionally changed OpenClaw skills/config and want to refresh baseline:
+To intentionally refresh the baseline:
 
 ```bash
-CLAWGUARD_LITE_REBASELINE=1 python3 skill/clawguard-lite/snapshot.py
+CLAWGUARD_REBASELINE=1 ./clawguard
 ```
 
 ## Verifying Release Files
 
-Use the included scripts:
+Use included scripts:
 
 ```bash
 # publisher side
@@ -37,10 +49,26 @@ Use the included scripts:
 ./scripts/release/verify_release.sh dist
 ```
 
-If `MINISIGN_SECRET_KEY` is set during signing, the script also generates
-`SHA256SUMS.minisig` and can bundle `minisign.pub` (via `MINISIGN_PUBLIC_KEY`).
+Release signing is mandatory:
+- set `MINISIGN_SECRET_KEY=/path/to/minisign.key`
+- set `MINISIGN_PUBLIC_KEY=/path/to/minisign.pub`
+- set `CLAWGUARD_PUBLISHER_ID=<stable-publisher-id>`
+- `sign_release.sh` emits `SHA256SUMS`, `SHA256SUMS.minisig`, and `minisign.pub`
+- `sign_release.sh` also emits `RELEASE_PROVENANCE.txt` (publisher + commit + build metadata)
 
-## Reporting Security Issues
+Optional stricter verify on user side:
+```bash
+CLAWGUARD_EXPECTED_PUBLISHER_ID=<stable-publisher-id> ./scripts/release/verify_release.sh dist
+```
 
-Please report issues privately first: `security@clawguard.net`
+## macOS Provenance
 
+Publisher helpers:
+- `scripts/release/macos_sign_and_notarize.sh`
+
+User verification helper:
+- `scripts/release/macos_verify_provenance.sh`
+
+## Private Reporting
+
+Report vulnerabilities privately first: `security@clawguard.net`

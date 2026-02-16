@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.clawguard</string>
+
+    <key>ProgramArguments</key>
+    <array>
+      <!-- Use a shell so $HOME expands even in launchd. -->
+      <string>/bin/bash</string>
+      <string>-lc</string>
+      <string>$HOME/.local/bin/clawguard -c $HOME/.clawguard/config.ini</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>$HOME/.clawguard/clawguard.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>$HOME/.clawguard/clawguard.err.log</string>
+  </dict>
+</plist>

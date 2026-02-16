@@ -1,0 +1,19 @@
+[Unit]
+Description=ClawGuard System Monitor for OpenClaw
+After=network.target
+
+[Service]
+Type=simple
+User=%i
+ExecStart=/usr/local/bin/clawguard -c /home/%i/.clawguard/config.ini
+Restart=on-failure
+RestartSec=10
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/%i/.clawguard
+
+[Install]
+WantedBy=multi-user.target
