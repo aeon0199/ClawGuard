@@ -2,6 +2,8 @@
 
 **High-performance system monitor built for the OpenClaw ecosystem.**
 
+<img src="assets/clawguard-logo.jpg" alt="ClawGuard Logo" width="420" />
+
 ClawGuard is a lightweight C++ daemon that continuously monitors your system's health and integrates natively with OpenClaw. Ask your bot "how's my system doing?" and get real answers with trend analysis and proactive alerts.
 
 ![ClawGuard Dashboard](https://img.shields.io/badge/dashboard-localhost:7677-ff3355)
